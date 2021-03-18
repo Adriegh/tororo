@@ -1,0 +1,8 @@
+{
+  "name": "live2d-resource-model-hijiki",
+  "version": "1.0.0",
+  "description": "Live2D model of cat Hijiki",
+  "main": "hijiki_t01.cmo3",
+  "author": "Adriegh",
+  "license": "ISC"
+}

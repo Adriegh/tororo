@@ -1,0 +1,16 @@
+{
+  "name": "pixi-live2d",
+  "version": "1.0.0",
+  "description": "pixi and live2d pair demo",
+  "main": "index.html",
+  "scripts": {
+    "build": "babel src -d lib"
+  },
+  "author": "Adriegh",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/cli": "^7.13.10",
+    "@babel/core": "^7.13.10",
+    "@babel/preset-env": "^7.13.10"
+  }
+}

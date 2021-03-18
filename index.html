@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="description" content="">
+	<meta name="author" content="Adriegh">
+	<title>PIXI-LIVE2D / CATS</title>
+	
+	<script src="https://cubism.live2d.com/sdk-web/cubismcore/live2dcubismcore.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/gh/dylanNew/live2d/webgl/Live2D/lib/live2d.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/pixi.js@5.3.6/dist/pixi.min.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/pixi-live2d-display/dist/index.min.js"></script>
+	<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+	<script type="text/babel">
+		window.onload = async () => {
+			const tororoModel = "https://cdn.jsdelivr.net/npm/live2d-resource-model-tororo@1.0.0/runtime/tororo.model3.json";
+			
+			let idleAnimationTimer = 0;
+			let idleAnimationCountdown = -1;
+			let idleAnimationCountdownMin = 500;
+			let idleAnimationCountdownMax = 800;
+			let eyeSizeTimer = 0;
+			let eyeSizeCountdown = 500;
+			let eyeSizeBig = false;
+			let tracking = false;
+			
+			
+			
+			function normalize(value, min, max) {
+				return ((2 * ((value - min) / (max - min))) - 1);
+			}
+			
+			function resize() {
+				app.renderer.resize(window.innerWidth, window.innerHeight);
+				tororo.position.x = ((app.screen.width / 2) - (tororo.width / 2));
+				tororo.position.y = ((app.screen.height / 2) - (tororo.height / 2));
+			}
+			
+			function mousemove(e) {
+				if(!tracking) return;
+				let screenWidthMin = -app.screen.width / 2;
+				let screenWidthMax = app.screen.width / 2;
+				let screenHeightMin = -app.screen.height / 2;
+				let screenHeightMax = app.screen.height / 2;
+			
+				let mouseX = normalize(e.offsetX - app.screen.width / 2, screenWidthMin, screenWidthMax);
+				let mouseY = normalize((app.screen.height / 2) - e.offsetY, screenHeightMin, screenHeightMax);
+				
+				tororo.internalModel.coreModel._parameterValues[5] = mouseX;
+				tororo.internalModel.coreModel._parameterValues[6] = mouseY;
+				eyeSizeBig = true;
+			}
+			
+			function sliders() {
+				const params = tororo.internalModel.coreModel._parameterIds;
+				const paramsValues = tororo.internalModel.coreModel._parameterValues;
+				const paramsMaxValues = tororo.internalModel.coreModel._parameterMaximumValues;
+				const paramsMinValues = tororo.internalModel.coreModel._parameterMinimumValues;
+				
+				let container = document.createElement('div');
+				container.classList.add('slidersContainer');
+				for(let it = 0; it<params.length; it++) {
+					let div = document.createElement('div');
+					div.classList.add('slider');
+					
+					let p = document.createElement('p');
+					p.innerHTML = `${params[it]} ( ${paramsMinValues[it]} \/ ${paramsMaxValues[it]} )`;
+					
+					let slider = document.createElement('input');
+					slider.setAttribute('number', it);
+					slider.type = 'range';
+					slider.value = parseInt(paramsValues[it]);
+					slider.max = parseInt(paramsMaxValues[it]);
+					slider.min = parseInt(paramsMinValues[it]);
+					slider.step = 0.1;
+					
+					slider.oninput = () => {
+						tororo.internalModel.coreModel._parameterValues[slider.getAttribute('number')] = slider.value;
+					};
+					
+					div.appendChild(p);
+					div.appendChild(slider);
+					container.appendChild(div);
+				}
+				document.body.appendChild(container);
+			}
+			
+			function actions() {
+				const animations = tororo.internalModel.motionManager.definitions;
+				
+				let container = document.createElement('div');
+				container.classList.add('actionsContainer');
+				for(let animation in animations) {
+					let div = document.createElement('div');
+					div.classList.add('action');
+					
+					let p = document.createElement('p');
+					p.innerHTML = `${animation} ( ${animations[animation].length} )`;
+					div.appendChild(p);
+					
+					for(let it=0; it<animations[animation].length; it++) {
+						let button = document.createElement('input');
+						button.setAttribute('number', it);
+						button.setAttribute('animation', animation);
+						button.type = 'button';
+						button.value = it;
+						
+						button.onclick = () => {
+							tororo.internalModel.motionManager.startMotion(button.getAttribute('animation'), button.getAttribute('number'));
+						};
+						div.appendChild(button);
+					}
+					container.appendChild(div);
+				}
+				let div = document.createElement('div');
+				div.classList.add('action');				
+				
+				let p = document.createElement('p');
+				p.innerHTML = `Switch tracking ( on / off )`;
+				div.appendChild(p);
+				
+				let button = document.createElement('input');
+				button.type = 'button';
+				button.value = 'switch';
+				button.onclick = () => {
+					tracking = !tracking;
+				};
+				
+				div.appendChild(button);
+				container.appendChild(div);
+				document.body.appendChild(container);
+			}
+			
+			
+			
+			const app = new PIXI.Application({
+				autoResize: true,
+				resolution: devicePixelRatio 
+			});
+			app.view.classList.add('app');
+
+			const tororo = await PIXI.live2d.Live2DModel.from(tororoModel, {autoUpdate: false});
+			const tororoMotions = tororo.internalModel.motionManager.definitions;
+			
+			tororo.scale.set(0.25);
+			tororo.internalModel.coreModel._parameterValues[7] = -0.5;
+			tororo.internalModel.motionManager.state.setReservedIdle('reserved', -1);
+			tororo.autoUpdate = true;
+			
+			app.ticker.add( delta => {
+				let eyeSize = tororo.internalModel.coreModel._parameterValues[7];
+				
+				if(idleAnimationTimer > idleAnimationCountdown && tororo.internalModel.motionManager.isFinished()) {
+					idleAnimationTimer = 0;
+					idleAnimationCountdown = idleAnimationCountdownMin + Math.floor(Math.random() * (idleAnimationCountdownMax - idleAnimationCountdownMin));
+					//tororo.internalModel.motionManager.startMotion('Idle', 0);
+				}
+				if(eyeSizeTimer > eyeSizeCountdown) {
+					eyeSizeTimer = 0;
+					eyeSizeBig = false;
+				}
+				if(eyeSizeBig && eyeSize < 1) {
+					tororo.internalModel.coreModel._parameterValues[7] += 0.02 * delta;
+				}
+				if(!eyeSizeBig && eyeSize > -0.5) {
+					tororo.internalModel.coreModel._parameterValues[7] -= 0.01 * delta;
+				}
+				idleAnimationTimer += 1 * delta;
+				eyeSizeTimer += 1 * delta;
+			});
+			
+			window.addEventListener('resize', resize);
+			window.addEventListener('mousemove', mousemove);
+			
+			document.body.appendChild(app.view);
+			app.stage.addChild(tororo);
+			resize(app);
+			sliders();
+			actions();
+		}
+	</script>
+	<style>
+		body {
+			margin: 0;
+			overflow: hidden;
+			cursor: grab;
+		}
+		.app {
+			position: absolute;
+			z-index: 0;
+		}
+		.slidersContainer {
+			position: relative;
+			width: 440px;
+			height: 512px;
+			background: rgba(0,0,256,0.5);
+			overflow-y: scroll;
+		}
+		.slider {
+			position: relative;
+			z-index: 5;
+			font: 12px monospace;
+			color: white;
+		}
+		.slider * {
+			display: inline-block;
+			margin: 4px 0;
+			text-align: right;
+			vertical-align: middle;
+		}
+		.slider p {
+			width: 256px;
+		}
+		.actionsContainer {
+			position: relative;
+			width: 440px;
+			height: 256px;
+			background: rgba(128,0,128,0.5);
+			overflow-y: scroll;
+		}
+		.action {
+			position: relative;
+			z-index: 5;
+			font: 12px monospace;
+			color: white;
+		}
+		.action * {
+			display: inline-block;
+			margin: 4px 0;
+			text-align: right;
+			vertical-align: middle;
+		}
+		.action p {
+			width: 256px;
+		}
+	</style>
+</head>
+<body>
+</body>
